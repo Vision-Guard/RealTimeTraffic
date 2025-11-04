@@ -36,8 +36,9 @@ jobs:
 
       - name: Install dependencies
         run: |
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          if [ -f TimerTrigger/requirements.txt ]; then pip install -r TimerTrigger/requirements.txt; fi
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
 
 
       # Optional: Add step to run tests here
@@ -87,4 +88,5 @@ jobs:
           package: '.'
 
           
+
 
