@@ -1,10 +1,13 @@
+import logging
 import os
 import requests
 import json
 from azure.eventhub import EventHubProducerClient, EventData
 from datetime import datetime, UTC
 from dotenv import load_dotenv
+import azure.functions as func
 
+# تحميل المتغيرات من البيئة
 load_dotenv()
 AZURE_MAPS_KEY = os.getenv("AZURE_MAPS_KEY")
 EVENTHUB_CONNECTION_STR = os.getenv("EVENTHUB_CONNECTION_STR")
@@ -32,11 +35,12 @@ def get_azure_maps_data(bbox):
         if response.status_code == 200:
             return response.json()
         else:
-            print(f"[ERROR] {response.status_code} - {response.text}")
+            logging.error(f"[ERROR] {response.status_code} - {response.text}")
             return None
     except Exception as e:
-        print(f"[EXCEPTION] Failed to fetch data: {e}")
+        logging.error(f"[EXCEPTION] Failed to fetch data: {e}")
         return None
+
 
 def send_to_eventhub(data):
     try:
@@ -83,13 +87,14 @@ def send_to_eventhub(data):
                 batch.add(EventData(json.dumps(event)))
 
             producer.send_batch(batch)
-        print(f"[INFO] {data.get('city', 'Unknown')} data sent to Event Hub successfully.")
-
+        logging.info(f"[INFO] {data.get('city', 'Unknown')} data sent to Event Hub successfully.")
     except Exception as e:
-        print(f"[EXCEPTION] Failed to send to Event Hub: {e}")
+        logging.error(f"[EXCEPTION] Failed to send to Event Hub: {e}")
 
 
-if __name__ == "__main__":
+def main(mytimer: func.TimerRequest) -> None:
+    logging.info('Timer trigger function executed at %s', datetime.utcnow())
+
     for city in cities:
         bbox = f"{city['minLon']},{city['minLat']},{city['maxLon']},{city['maxLat']}"
         data = get_azure_maps_data(bbox)
