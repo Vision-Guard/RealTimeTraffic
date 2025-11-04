@@ -4,14 +4,16 @@ import requests
 import json
 from azure.eventhub import EventHubProducerClient, EventData
 from datetime import datetime, UTC
-from dotenv import load_dotenv
 import azure.functions as func
 
-# تحميل المتغيرات من البيئة
-load_dotenv()
-AZURE_MAPS_KEY = os.getenv("AZURE_MAPS_KEY")
-EVENTHUB_CONNECTION_STR = os.getenv("EVENTHUB_CONNECTION_STR")
-EVENTHUB_NAME = os.getenv("EVENTHUB_NAME")
+# قراءة المتغيرات من Azure Application Settings
+AZURE_MAPS_KEY = os.environ.get("AZURE_MAPS_KEY")
+EVENTHUB_CONNECTION_STR = os.environ.get("EVENTHUB_CONNECTION_STR")
+EVENTHUB_NAME = os.environ.get("EVENTHUB_NAME")
+
+# التحقق من وجود المتغيرات
+if not all([AZURE_MAPS_KEY, EVENTHUB_CONNECTION_STR, EVENTHUB_NAME]):
+    logging.error("Missing required environment variables!")
 
 MAPS_URL = "https://atlas.microsoft.com/traffic/incident"
 MAPS_PARAMS = {
@@ -93,10 +95,20 @@ def send_to_eventhub(data):
 
 
 def main(mytimer: func.TimerRequest) -> None:
-    logging.info('Timer trigger function executed at %s', datetime.utcnow())
+    utc_timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
+    
+    if mytimer.past_due:
+        logging.info('The timer is past due!')
+    
+    logging.info('Timer trigger function executed at %s', utc_timestamp)
 
     for city in cities:
         bbox = f"{city['minLon']},{city['minLat']},{city['maxLon']},{city['maxLat']}"
+        logging.info(f"Fetching data for {city['name']}...")
         data = get_azure_maps_data(bbox)
         if data:
             send_to_eventhub({"city": city["name"], "data": data})
+        else:
+            logging.warning(f"No data received for {city['name']}")
+    
+    logging.info('Timer trigger function completed successfully')
