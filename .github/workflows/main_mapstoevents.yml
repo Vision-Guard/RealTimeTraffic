@@ -45,8 +45,6 @@ jobs:
 
       - name: Prepare artifact for deployment
         run: |
-          # ensure requirements.txt exists at root
-          cp requirements.txt ./requirements.txt
           # zip all project files except venv
           zip -r release.zip . -x "venv/*"
 
@@ -88,3 +86,4 @@ jobs:
           app-name: 'MapsToEvents'
           slot-name: 'Production'
           package: '.'
+
