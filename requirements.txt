@@ -1,3 +1,4 @@
+dotenv
 azure-functions
 requests
 azure-eventhub
