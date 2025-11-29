@@ -1,8 +1,8 @@
 import os
 import json
+import requests
 from azure.eventhub import EventHubProducerClient, EventData
 from datetime import datetime, UTC
-import requests
 
 
 load_dotenv()
