@@ -4,7 +4,7 @@ A fully automated **real-time data engineering pipeline** built on Microsoft Azu
 
 ## Architecture Overview
 Azure Maps → Function App → Event Hubs → Stream Analytics → Power BI  
-                           SQL Database → Future ML Model
+                          SQL Database → Future ML Model
 
 
 ## Project Description
