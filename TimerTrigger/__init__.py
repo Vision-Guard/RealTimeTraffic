@@ -1,11 +1,12 @@
+import logging
 import os
 import json
 import requests
-from azure.eventhub import EventHubProducerClient, EventData
 from datetime import datetime, UTC
+from azure.eventhub import EventHubProducerClient, EventData
+from azure.functions import TimerRequest
 
 
-load_dotenv()
 AZURE_MAPS_KEY = "MEf5Ey7DKZcevR4aa2CItXjIgnYqg5NhXHBJCrARwW6tLNlIkdKiJQQJ99BJAC5RqLJXZEq6AAAgAZMP2HQE"
 EVENTHUB_CONNECTION_STR = "Endpoint=sb://trafficevents.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=KSO40tZT2YRxcgvbWASeCowhtMjb3rX7W+AEhJReg3E="
 EVENTHUB_NAME = "TrafficEvents"
@@ -33,10 +34,10 @@ def get_azure_maps_data(bbox):
         if response.status_code == 200:
             return response.json()
         else:
-            print(f"[ERROR] {response.status_code} - {response.text}")
+            logging.error(f"[ERROR] {response.status_code} - {response.text}")
             return None
     except Exception as e:
-        print(f"[EXCEPTION] Failed to fetch data: {e}")
+        logging.error(f"[EXCEPTION] Failed to fetch data: {e}")
         return None
 
 
@@ -49,7 +50,7 @@ def send_to_eventhub(data):
 
         with producer:
             batch = producer.create_batch()
-            logs = []  
+            logs = []
 
             if "data" in data and "features" in data["data"]:
                 for feature in data["data"]["features"]:
@@ -59,10 +60,10 @@ def send_to_eventhub(data):
                     raw_timestamp = props.get("lastModifiedTime")
 
                     try:
-                        if raw_timestamp:
-                            parsed_time = datetime.fromisoformat(raw_timestamp.replace("Z", "+00:00"))
-                        else:
-                            parsed_time = datetime.now(UTC)
+                        parsed_time = (
+                            datetime.fromisoformat(raw_timestamp.replace("Z", "+00:00"))
+                            if raw_timestamp else datetime.now(UTC)
+                        )
                         timestamp_iso = parsed_time.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
                     except Exception:
                         timestamp_iso = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
@@ -80,10 +81,8 @@ def send_to_eventhub(data):
                         "timestamp": timestamp_iso
                     }
 
-                    print(json.dumps(event, ensure_ascii=False, indent=2))
-
+                    logging.info(json.dumps(event, ensure_ascii=False))
                     logs.append(event)
-
                     batch.add(EventData(json.dumps(event, ensure_ascii=False)))
 
             else:
@@ -94,23 +93,27 @@ def send_to_eventhub(data):
                     "description": "No incidents found",
                     "timestamp": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
                 }
-                print(json.dumps(event, ensure_ascii=False, indent=2))
+
+                logging.info(json.dumps(event, ensure_ascii=False))
                 logs.append(event)
                 batch.add(EventData(json.dumps(event, ensure_ascii=False)))
 
             producer.send_batch(batch)
 
-        with open("test_logs.json", "a", encoding="utf-8") as f:
-            json.dump(logs, f, ensure_ascii=False, indent=2)
-            f.write("\n")
-
-        print(f"[INFO] ✅ {data.get('city', 'Unknown')} data sent and logged successfully.\n")
+        logging.info(f"[INFO] {data.get('city', 'Unknown')} data sent successfully.")
 
     except Exception as e:
-        print(f"[EXCEPTION] Failed to send to Event Hub: {e}")
+        logging.error(f"[EXCEPTION] Failed to send to Event Hub: {e}")
 
 
-if __name__ == "__main__":
+# MAIN FUNCTION
+def main(mytimer: TimerRequest) -> None:
+    utc_timestamp = datetime.utcnow().isoformat()
+    logging.info(f"Python timer trigger function ran at {utc_timestamp}")
+
+    if mytimer.past_due:
+        logging.warning("The timer is past due!")
+
     for city in cities:
         bbox = f"{city['minLon']},{city['minLat']},{city['maxLon']},{city['maxLat']}"
         data = get_azure_maps_data(bbox)
